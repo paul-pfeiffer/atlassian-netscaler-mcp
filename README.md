@@ -148,7 +148,6 @@ Then set `JIRA_CUSTOMER_PROFILE=<name>`. See `config/customers/example/` for a f
 
 - [ ] Cross-platform keychain support (Windows Credential Manager, libsecret)
 - [ ] Headless cookie refresh via stored credentials (where SSO allows)
-- [ ] Bitbucket Server tools
 - [ ] Schema-driven profile validation
 
 ## Contributing

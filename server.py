@@ -15,16 +15,6 @@ from mcp.server import session as mcp_session
 CONFLUENCE_URL = os.environ.get("CONFLUENCE_URL", "").rstrip("/")
 JIRA_URL = os.environ.get("JIRA_URL", "").rstrip("/")
 
-CONFLUENCE_OP_REFS = [
-    os.environ.get("CONFLUENCE_OP_REF", "").strip(),
-    "op://Employee/confluence api token/password",
-]
-JIRA_OP_REFS = [
-    os.environ.get("JIRA_OP_REF", "").strip(),
-    "op://Employee/jira api token/password",
-    "op://Employee/confluence api token/password",
-]
-
 KEYCHAIN_SERVICE = "confluence-mcp"
 CONFLUENCE_KEYCHAIN_ACCOUNTS = [
     "confluence-session-cookie",
@@ -139,20 +129,6 @@ def _patch_server_session_init_tolerance() -> None:
 _patch_server_session_init_tolerance()
 
 
-def _read_op_secret(refs: list[str]) -> str:
-    if not shutil.which("op"):
-        return ""
-    for ref in [ref for ref in refs if ref]:
-        result = subprocess.run(
-            ["op", "read", ref],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-    return ""
-
-
 def _keychain_cookie(accounts: list[str]) -> str:
     for account in accounts:
         value = keyring.get_password(KEYCHAIN_SERVICE, account)
@@ -205,8 +181,6 @@ def _confluence_token() -> str:
     token = os.environ.get("CONFLUENCE_TOKEN", "").strip()
     if not token:
         token = os.environ.get("ATLASSIAN_TOKEN", "").strip()
-    if not token:
-        token = _read_op_secret(CONFLUENCE_OP_REFS)
     return token
 
 
@@ -214,8 +188,6 @@ def _jira_token() -> str:
     token = os.environ.get("JIRA_TOKEN", "").strip()
     if not token:
         token = os.environ.get("ATLASSIAN_TOKEN", "").strip()
-    if not token:
-        token = _read_op_secret(JIRA_OP_REFS)
     return token
 
 
@@ -300,9 +272,7 @@ def _load_confluence_auth() -> tuple[str, str]:
     raise RuntimeError(
         "No Confluence credentials found.\n"
         "Cookie: run login.py --target confluence to authenticate via browser and store a session cookie\n"
-        "PAT fallback: ensure 'op' is signed in and one of these refs exists:\n"
-        f"- {CONFLUENCE_OP_REFS[1]}\n"
-        "or set CONFLUENCE_OP_REF to a custom 1Password reference"
+        "Token: set CONFLUENCE_TOKEN (or ATLASSIAN_TOKEN) to a Confluence PAT"
     )
 
 
@@ -327,10 +297,7 @@ def _load_jira_auth() -> tuple[str, str]:
     raise RuntimeError(
         "No Jira credentials found.\n"
         "Cookie: run login.py --target jira to store a Jira/NetScaler session cookie\n"
-        "Token: set JIRA_TOKEN or ensure 'op' is signed in with one of these refs:\n"
-        f"- {JIRA_OP_REFS[1]}\n"
-        f"- {JIRA_OP_REFS[2]}\n"
-        "or set JIRA_OP_REF to a custom 1Password reference"
+        "Token: set JIRA_TOKEN (or ATLASSIAN_TOKEN) to a Jira PAT"
     )
 
 
