@@ -73,21 +73,23 @@ direnv allow            # if you use direnv
 
 Required:
 
-| Variable          | Description                                     |
-| ----------------- | ----------------------------------------------- |
-| `CONFLUENCE_URL`  | Base URL of your Confluence instance            |
-| `JIRA_URL`        | Base URL of your Jira instance                  |
+| Variable           | Description                                                      |
+| ------------------ | ---------------------------------------------------------------- |
+| `CONFLUENCE_URL`   | Base URL of your Confluence instance                             |
+| `JIRA_URL`         | Base URL of your Jira instance                                   |
+| `CONFLUENCE_TOKEN` | Confluence PAT (or fall back to `ATLASSIAN_TOKEN` for both)      |
+| `JIRA_TOKEN`       | Jira PAT (or fall back to `ATLASSIAN_TOKEN` for both)            |
 
 Useful optional:
 
-| Variable                        | Default            | Description                                          |
-| ------------------------------- | ------------------ | ---------------------------------------------------- |
-| `MCP_TRANSPORT`                 | `sse`              | FastMCP transport (`sse`, `http`, `stdio`)           |
-| `MCP_PORT`                      | `8000`             | Port for SSE/HTTP transport                          |
-| `MCP_AUTO_NETSCALER_LOGIN`      | `1`                | Auto-trigger `login.py` when cookie missing/expired  |
-| `MCP_AUTO_NETSCALER_TARGETS`    | `jira,confluence`  | Which targets to auto-login                          |
-| `JIRA_CUSTOMER_PROFILE`         | —                  | Profile name under `config/customers/<name>/`        |
-| `CONFLUENCE_TOKEN` / `JIRA_TOKEN` | —                | API tokens (alternative to cookie auth)              |
+| Variable                    | Default | Description                                                    |
+| --------------------------- | ------- | -------------------------------------------------------------- |
+| `MCP_TRANSPORT`             | `sse`   | FastMCP transport (`sse`, `http`, `stdio`)                     |
+| `MCP_PORT`                  | `8000`  | Port for SSE/HTTP transport                                    |
+| `MCP_AUTO_NETSCALER_LOGIN`  | `1`     | Auto-trigger `login.py` when NetScaler cookie missing/expired  |
+| `NETSCALER_LOGIN_URL`       | —       | Explicit URL for the login flow (defaults to `JIRA_URL`)       |
+| `NETSCALER_COOKIE`          | —       | Inject a cookie directly instead of reading it from the store  |
+| `JIRA_CUSTOMER_PROFILE`     | —       | Profile name under `config/customers/<name>/`                  |
 
 ## Usage
 
@@ -102,9 +104,11 @@ The first call against an endpoint without a valid session will pop a Chromium w
 ### Manual login
 
 ```bash
-uv run login.py --target jira
-uv run login.py --target confluence
+uv run login.py
 ```
+
+Only one login is needed — the NetScaler cookie fronts both Jira and Confluence.
+The Jira/Confluence APIs themselves authenticate via Personal Access Token (`CONFLUENCE_TOKEN` / `JIRA_TOKEN`).
 
 ### Wire into an MCP client
 

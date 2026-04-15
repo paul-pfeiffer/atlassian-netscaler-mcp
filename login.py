@@ -4,27 +4,31 @@
 # dependencies = ["playwright", "keyring"]
 # ///
 """
-Opens a browser, waits for you to log in via SSO,
-then stores the session cookie securely in OS keychain
+Opens a browser, waits for you to log in via Citrix NetScaler / SSO,
+then stores the resulting session cookie in the OS keychain
 (macOS Keychain / libsecret / Windows Credential Manager) with a
 file-backed fallback under $XDG_CONFIG_HOME/atlassian-mcp/cookies/.
+
+Only ONE login is needed — the NetScaler cookie fronts both Jira and
+Confluence. The actual Jira/Confluence API calls authenticate via PAT
+(see CONFLUENCE_TOKEN / JIRA_TOKEN).
 
 First-time setup:
   uv run --with playwright python -m playwright install chromium
 
 Usage:
-  uv run login.py --target jira
-  uv run login.py --target confluence
+  uv run login.py
 
 Configuration (env vars):
-  JIRA_URL              Base URL of the Jira instance (required for --target jira)
-  CONFLUENCE_URL        Base URL of the Confluence instance (required for --target confluence)
-  COOKIE_DOMAIN         Substring to match against cookie domains (e.g. "example.com").
-                        Defaults to the registrable suffix of the target URL host.
+  JIRA_URL              Base URL used for the login flow (preferred).
+  CONFLUENCE_URL        Fallback if JIRA_URL is not set.
+  NETSCALER_LOGIN_URL   Explicit override for the login URL.
+  COOKIE_DOMAIN         Substring to match against cookie domains
+                        (e.g. "example.com"). Defaults to the
+                        registrable suffix of the login URL host.
   LOGIN_TIMEOUT_SECONDS How long to wait for SSO completion (default: 300)
 """
 
-import argparse
 import os
 import sys
 import time
@@ -36,19 +40,9 @@ from playwright.sync_api import sync_playwright, Page
 
 from cookie_store import set_cookie
 
+KEYCHAIN_ACCOUNT = "netscaler-session-cookie"
 LEGACY_KEYCHAIN_ACCOUNT = "session-cookie"
 SSO_INDICATORS = ["login", "sso", "auth", "saml", "adfs", "idp", "oidc"]
-
-TARGETS = {
-    "jira": {
-        "url_env": "JIRA_URL",
-        "keychain_account": "jira-session-cookie",
-    },
-    "confluence": {
-        "url_env": "CONFLUENCE_URL",
-        "keychain_account": "confluence-session-cookie",
-    },
-}
 
 
 def default_cookie_domain(base_url: str) -> str:
@@ -57,8 +51,19 @@ def default_cookie_domain(base_url: str) -> str:
     return ".".join(parts[-2:]) if len(parts) >= 2 else host
 
 
-def store_cookie(cookie: str, account: str) -> str:
-    where = set_cookie(account, cookie)
+def resolve_login_url() -> str:
+    for env in ("NETSCALER_LOGIN_URL", "JIRA_URL", "CONFLUENCE_URL"):
+        value = os.environ.get(env, "").strip().rstrip("/")
+        if value:
+            return value
+    raise SystemExit(
+        "Set NETSCALER_LOGIN_URL (or JIRA_URL / CONFLUENCE_URL) so the "
+        "login flow knows which URL to open."
+    )
+
+
+def store_cookie(cookie: str) -> str:
+    where = set_cookie(KEYCHAIN_ACCOUNT, cookie)
     set_cookie(LEGACY_KEYCHAIN_ACCOUNT, cookie)
     return where
 
@@ -80,17 +85,8 @@ def cookie_string(page: Page, cookie_domain: str) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--target", choices=["jira", "confluence"], default="jira")
-    args = parser.parse_args()
-
-    target = TARGETS[args.target]
-    base_url = os.environ.get(target["url_env"], "").rstrip("/")
-    if not base_url:
-        raise SystemExit(f"{target['url_env']} env var is required for --target {args.target}")
-
+    base_url = resolve_login_url()
     cookie_domain = os.environ.get("COOKIE_DOMAIN", "").strip() or default_cookie_domain(base_url)
-    keychain_account = target["keychain_account"]
     timeout_seconds = int(os.environ.get("LOGIN_TIMEOUT_SECONDS", "300"))
 
     with sync_playwright() as p:
@@ -122,8 +118,8 @@ def main():
             browser.close()
 
     print(f"Logged in — captured {n} cookies")
-    backend = store_cookie(cookie, keychain_account)
-    print(f"Cookie stored in {backend} as '{keychain_account}' — session is ready.")
+    backend = store_cookie(cookie)
+    print(f"Cookie stored in {backend} as '{KEYCHAIN_ACCOUNT}' — session is ready.")
 
 
 if __name__ == "__main__":

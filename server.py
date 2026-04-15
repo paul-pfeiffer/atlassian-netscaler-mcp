@@ -16,13 +16,12 @@ from mcp.server import session as mcp_session
 CONFLUENCE_URL = os.environ.get("CONFLUENCE_URL", "").rstrip("/")
 JIRA_URL = os.environ.get("JIRA_URL", "").rstrip("/")
 
-CONFLUENCE_KEYCHAIN_ACCOUNTS = [
-    "confluence-session-cookie",
+NETSCALER_KEYCHAIN_ACCOUNTS = [
+    "netscaler-session-cookie",
     "session-cookie",
-]
-JIRA_KEYCHAIN_ACCOUNTS = [
+    # legacy / back-compat with earlier per-target accounts
     "jira-session-cookie",
-    "session-cookie",
+    "confluence-session-cookie",
 ]
 AUTO_NETSCALER_LOGIN = os.environ.get("MCP_AUTO_NETSCALER_LOGIN", "1").lower() in {
     "1",
@@ -30,20 +29,12 @@ AUTO_NETSCALER_LOGIN = os.environ.get("MCP_AUTO_NETSCALER_LOGIN", "1").lower() i
     "yes",
     "on",
 }
-AUTO_NETSCALER_TARGETS = {
-    target.strip().lower()
-    for target in os.environ.get(
-        "MCP_AUTO_NETSCALER_TARGETS",
-        "jira,confluence",
-    ).split(",")
-    if target.strip()
-}
-AUTO_NETSCALER_MAX_LOGINS = int(os.environ.get("MCP_AUTO_NETSCALER_MAX_LOGINS", "1"))
 LOGIN_SCRIPT = os.path.join(os.path.dirname(__file__), "login.py")
 _AUTH_LOCK = threading.Lock()
 _AUTH_READY = False
-_CONFLUENCE_AUTH: tuple[str, str] | None = None
-_JIRA_AUTH: tuple[str, str] | None = None
+_NETSCALER_COOKIE: str = ""
+_CONFLUENCE_TOKEN: str = ""
+_JIRA_TOKEN: str = ""
 TOLERATE_EARLY_REQUESTS = os.environ.get("MCP_TOLERATE_EARLY_REQUESTS", "1").lower() in {
     "1",
     "true",
@@ -129,38 +120,12 @@ def _patch_server_session_init_tolerance() -> None:
 _patch_server_session_init_tolerance()
 
 
-def _keychain_cookie(accounts: list[str]) -> str:
-    for account in accounts:
+def _keychain_cookie() -> str:
+    for account in NETSCALER_KEYCHAIN_ACCOUNTS:
         value = get_cookie(account)
         if value:
             return value
     return ""
-
-
-def _is_authenticated_response(resp: httpx.Response, *, confluence: bool = False) -> bool:
-    if resp.status_code != 200:
-        return False
-    content_type = resp.headers.get("content-type", "")
-    if "application/json" not in content_type:
-        return False
-    if confluence and '"type":"anonymous"' in resp.text.replace(" ", ""):
-        return False
-    return True
-
-
-def _cookie_is_valid(
-    *,
-    base_url: str,
-    verify_path: str,
-    cookie: str,
-    confluence: bool = False,
-) -> bool:
-    with httpx.Client(follow_redirects=False) as client:
-        resp = client.get(
-            f"{base_url}{verify_path}",
-            headers={"Cookie": cookie, "Accept": "application/json"},
-        )
-    return _is_authenticated_response(resp, confluence=confluence)
 
 
 def _netscaler_cookie_is_valid(*, base_url: str, cookie: str) -> bool:
@@ -191,7 +156,7 @@ def _jira_token() -> str:
     return token
 
 
-def _run_netscaler_login(target: str) -> None:
+def _run_netscaler_login() -> None:
     if not shutil.which("uv"):
         raise RuntimeError(
             "Automatic NetScaler login requires 'uv' on PATH "
@@ -207,144 +172,86 @@ def _run_netscaler_login(target: str) -> None:
             "keyring",
             "python",
             LOGIN_SCRIPT,
-            "--target",
-            target,
         ],
         check=True,
     )
 
 
-def _ensure_netscaler_sessions() -> None:
+def _load_netscaler_cookie() -> str:
+    """Load a NetScaler session cookie, triggering browser login if needed."""
+    cookie = os.environ.get("NETSCALER_COOKIE", "").strip()
+    if not cookie:
+        cookie = _keychain_cookie()
+
+    if cookie and _netscaler_cookie_is_valid(base_url=JIRA_URL, cookie=cookie):
+        return cookie
+
     if not AUTO_NETSCALER_LOGIN:
-        return
-
-    logins_used = 0
-
-    if (
-        "jira" in AUTO_NETSCALER_TARGETS
-        and not os.environ.get("JIRA_COOKIE", "").strip()
-    ):
-        jira_cookie = _keychain_cookie(JIRA_KEYCHAIN_ACCOUNTS)
-        jira_netscaler_valid = bool(jira_cookie) and _netscaler_cookie_is_valid(
-            base_url=JIRA_URL,
-            cookie=jira_cookie,
+        raise RuntimeError(
+            "No valid NetScaler session cookie found.\n"
+            "Run `uv run login.py` to authenticate via browser, or set "
+            "MCP_AUTO_NETSCALER_LOGIN=1 to let the server do it."
         )
-        if not jira_netscaler_valid:
-            if logins_used < AUTO_NETSCALER_MAX_LOGINS:
-                _run_netscaler_login("jira")
-                logins_used += 1
 
-    if (
-        "confluence" in AUTO_NETSCALER_TARGETS
-        and not os.environ.get("CONFLUENCE_COOKIE", "").strip()
-    ):
-        confluence_cookie = _keychain_cookie(CONFLUENCE_KEYCHAIN_ACCOUNTS)
-        confluence_netscaler_valid = bool(confluence_cookie) and _netscaler_cookie_is_valid(
-            base_url=CONFLUENCE_URL,
-            cookie=confluence_cookie,
-        )
-        if not confluence_netscaler_valid:
-            if logins_used < AUTO_NETSCALER_MAX_LOGINS:
-                _run_netscaler_login("confluence")
-                logins_used += 1
-
-
-def _load_confluence_auth() -> tuple[str, str]:
-    """Returns (auth_type, value) where auth_type is 'bearer' or 'cookie'."""
-    cookie = os.environ.get("CONFLUENCE_COOKIE", "").strip()
+    _run_netscaler_login()
+    cookie = _keychain_cookie()
     if not cookie:
-        cookie = _keychain_cookie(CONFLUENCE_KEYCHAIN_ACCOUNTS)
-    cookie_valid = bool(cookie) and _cookie_is_valid(
-        base_url=CONFLUENCE_URL,
-        verify_path="/rest/api/user/current",
-        cookie=cookie,
-        confluence=True,
-    )
-    if cookie_valid:
-        return "cookie", cookie
-
-    token = _confluence_token()
-    if token:
-        return "bearer", token
-    if cookie:
-        return "cookie", cookie
-
-    raise RuntimeError(
-        "No Confluence credentials found.\n"
-        "Cookie: run login.py --target confluence to authenticate via browser and store a session cookie\n"
-        "Token: set CONFLUENCE_TOKEN (or ATLASSIAN_TOKEN) to a Confluence PAT"
-    )
-
-
-def _load_jira_auth() -> tuple[str, str]:
-    cookie = os.environ.get("JIRA_COOKIE", "").strip()
-    if not cookie:
-        cookie = _keychain_cookie(JIRA_KEYCHAIN_ACCOUNTS)
-
-    token = _jira_token()
-    netscaler_cookie_valid = bool(cookie) and _netscaler_cookie_is_valid(
-        base_url=JIRA_URL,
-        cookie=cookie,
-    )
-
-    if netscaler_cookie_valid and token:
-        return "cookie+bearer", f"{cookie}\n{token}"
-    if token:
-        return "bearer", token
-    if cookie:
-        return "cookie", cookie
-
-    raise RuntimeError(
-        "No Jira credentials found.\n"
-        "Cookie: run login.py --target jira to store a Jira/NetScaler session cookie\n"
-        "Token: set JIRA_TOKEN (or ATLASSIAN_TOKEN) to a Jira PAT"
-    )
+        raise RuntimeError("NetScaler login completed but no cookie was stored.")
+    return cookie
 
 
 mcp = FastMCP("atlassian")
 
 
 def _ensure_auth_loaded() -> None:
-    global _AUTH_READY, _CONFLUENCE_AUTH, _JIRA_AUTH
+    global _AUTH_READY, _NETSCALER_COOKIE, _CONFLUENCE_TOKEN, _JIRA_TOKEN
     if _AUTH_READY:
         return
     with _AUTH_LOCK:
         if _AUTH_READY:
             return
-        _ensure_netscaler_sessions()
-        _CONFLUENCE_AUTH = _load_confluence_auth()
-        _JIRA_AUTH = _load_jira_auth()
+        confluence_token = _confluence_token()
+        jira_token = _jira_token()
+        if not confluence_token:
+            raise RuntimeError(
+                "CONFLUENCE_TOKEN (or ATLASSIAN_TOKEN) env var is required — "
+                "the Confluence API is accessed via PAT."
+            )
+        if not jira_token:
+            raise RuntimeError(
+                "JIRA_TOKEN (or ATLASSIAN_TOKEN) env var is required — "
+                "the Jira API is accessed via PAT."
+            )
+        _NETSCALER_COOKIE = _load_netscaler_cookie()
+        _CONFLUENCE_TOKEN = confluence_token
+        _JIRA_TOKEN = jira_token
         _AUTH_READY = True
 
 
 def _confluence_headers() -> dict:
     _ensure_auth_loaded()
-    auth_type, auth_value = _CONFLUENCE_AUTH or ("", "")
-    if auth_type == "bearer":
-        return {"Authorization": f"Bearer {auth_value}", "Accept": "application/json"}
-    return {"Cookie": auth_value, "Accept": "application/json"}
+    return {
+        "Cookie": _NETSCALER_COOKIE,
+        "Authorization": f"Bearer {_CONFLUENCE_TOKEN}",
+        "Accept": "application/json",
+    }
 
 
 def _jira_headers() -> dict:
     _ensure_auth_loaded()
-    auth_type, auth_value = _JIRA_AUTH or ("", "")
-    if auth_type == "cookie+bearer":
-        cookie, token = auth_value.split("\n", 1)
-        return {
-            "Cookie": cookie,
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json",
-        }
-    if auth_type == "bearer":
-        return {"Authorization": f"Bearer {auth_value}", "Accept": "application/json"}
+    return {
+        "Cookie": _NETSCALER_COOKIE,
+        "Authorization": f"Bearer {_JIRA_TOKEN}",
+        "Accept": "application/json",
+    }
     return {"Cookie": auth_value, "Accept": "application/json"}
 
 
 def _check_confluence(resp: httpx.Response):
     if resp.status_code in (301, 302, 303, 307, 308):
         raise RuntimeError(
-            "Confluence request was redirected — token may be expired or blocked by NetScaler.\n"
-            "Try running login.py --target confluence to use session cookie auth."
+            "Confluence request was redirected — NetScaler cookie may be expired.\n"
+            "Run `uv run login.py` to refresh the session cookie."
         )
     resp.raise_for_status()
 
@@ -363,7 +270,7 @@ def _check_jira(resp: httpx.Response):
     if "text/html" in content_type:
         raise RuntimeError(
             f"Got HTML instead of JSON (HTTP {resp.status_code}) — likely a NetScaler login page. "
-            f"Try running login.py --target jira to use session cookie auth instead."
+            f"Run `uv run login.py` to refresh the session cookie."
         )
     if resp.status_code == 400:
         details: str

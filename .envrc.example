@@ -11,8 +11,7 @@ export MCP_PORT="${MCP_PORT:-8000}"
 
 # Auto-trigger SSO/NetScaler login when session cookie is missing/expired
 export MCP_AUTO_NETSCALER_LOGIN="${MCP_AUTO_NETSCALER_LOGIN:-1}"
-export MCP_AUTO_NETSCALER_TARGETS="${MCP_AUTO_NETSCALER_TARGETS:-jira,confluence}"
-export MCP_AUTO_NETSCALER_MAX_LOGINS="${MCP_AUTO_NETSCALER_MAX_LOGINS:-1}"
+# export NETSCALER_LOGIN_URL="${NETSCALER_LOGIN_URL:-$JIRA_URL}"
 
 # Per-customer profile (config/customers/<name>/profile.json)
 export JIRA_CUSTOMER_PROFILE="${JIRA_CUSTOMER_PROFILE:-example}"
