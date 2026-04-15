@@ -152,9 +152,7 @@ Then set `JIRA_CUSTOMER_PROFILE=<name>`.
 
 ## Roadmap
 
-- [ ] Headless cookie refresh where the SSO flow allows it
 - [ ] Schema-driven profile validation
-- [ ] A minimal test suite
 
 ## Contributing
 
