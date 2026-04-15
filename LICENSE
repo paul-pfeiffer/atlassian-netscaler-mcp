@@ -19,23 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-
----
-
-DISCLAIMER OF LIABILITY
-
-To the maximum extent permitted by applicable law, the authors and
-contributors of this Software disclaim ALL liability of any kind arising
-from the use, misuse, or inability to use this Software, including but not
-limited to: direct, indirect, incidental, special, exemplary, consequential,
-or punitive damages; loss of data, profits, revenue, or business;
-unauthorized access to systems; security breaches; account lockouts; service
-disruptions; violations of third-party terms of service (including but not
-limited to those of Atlassian, Citrix, or any identity provider); or any
-other harm whatsoever.
-
-This Software interacts with third-party systems (Jira, Confluence,
-NetScaler, SSO providers) and stores authentication material on the user's
-machine. Users are solely responsible for ensuring their use complies with
-all applicable laws, employer policies, and the terms of service of the
-systems they connect to. Use at your own risk.

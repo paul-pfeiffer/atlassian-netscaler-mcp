@@ -34,6 +34,8 @@ import sys
 import time
 from urllib.parse import urlparse
 
+# PEP-723 `uv run` scripts don't include the script's own directory on
+# sys.path, so we add it here to import the sibling cookie_store module.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from playwright.sync_api import sync_playwright, Page
@@ -46,9 +48,24 @@ SSO_INDICATORS = ["login", "sso", "auth", "saml", "adfs", "idp", "oidc"]
 
 
 def default_cookie_domain(base_url: str) -> str:
-    host = urlparse(base_url).hostname or ""
-    parts = host.split(".")
-    return ".".join(parts[-2:]) if len(parts) >= 2 else host
+    """Default to the full host — safer than guessing a registrable suffix.
+
+    Naive suffix-splitting gets tripped up by multi-label TLDs like
+    .co.uk (would match every *.co.uk cookie). Users with non-host-only
+    cookies (e.g. a wildcard SSO domain) can override via COOKIE_DOMAIN.
+    """
+    return urlparse(base_url).hostname or ""
+
+
+def _domain_matches(cookie_domain: str, wanted: str) -> bool:
+    """Suffix-match with a leading-dot boundary so 'example.com' does NOT
+    match 'evil-example.com.attacker'. Handles leading dots in cookie
+    domains (RFC 6265: a leading dot is equivalent to no dot)."""
+    cookie_domain = cookie_domain.lstrip(".").lower()
+    wanted = wanted.lstrip(".").lower()
+    if not cookie_domain or not wanted:
+        return False
+    return cookie_domain == wanted or cookie_domain.endswith("." + wanted)
 
 
 def resolve_login_url() -> str:
@@ -80,7 +97,7 @@ def is_logged_in(page: Page, base_url: str) -> bool:
 
 def cookie_string(page: Page, cookie_domain: str) -> str:
     cookies = page.context.cookies()
-    relevant = [c for c in cookies if cookie_domain in c.get("domain", "")]
+    relevant = [c for c in cookies if _domain_matches(c.get("domain", ""), cookie_domain)]
     return "; ".join(f"{c['name']}={c['value']}" for c in relevant)
 
 

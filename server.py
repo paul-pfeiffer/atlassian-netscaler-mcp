@@ -16,13 +16,7 @@ from mcp.server import session as mcp_session
 CONFLUENCE_URL = os.environ.get("CONFLUENCE_URL", "").rstrip("/")
 JIRA_URL = os.environ.get("JIRA_URL", "").rstrip("/")
 
-NETSCALER_KEYCHAIN_ACCOUNTS = [
-    "netscaler-session-cookie",
-    "session-cookie",
-    # legacy / back-compat with earlier per-target accounts
-    "jira-session-cookie",
-    "confluence-session-cookie",
-]
+NETSCALER_KEYCHAIN_ACCOUNT = "netscaler-session-cookie"
 AUTO_NETSCALER_LOGIN = os.environ.get("MCP_AUTO_NETSCALER_LOGIN", "1").lower() in {
     "1",
     "true",
@@ -121,14 +115,20 @@ _patch_server_session_init_tolerance()
 
 
 def _keychain_cookie() -> str:
-    for account in NETSCALER_KEYCHAIN_ACCOUNTS:
-        value = get_cookie(account)
-        if value:
-            return value
-    return ""
+    return get_cookie(NETSCALER_KEYCHAIN_ACCOUNT)
+
+
+_SSO_URL_MARKERS = ("login", "logon", "sso", "saml", "adfs", "oidc")
 
 
 def _netscaler_cookie_is_valid(*, base_url: str, cookie: str) -> bool:
+    """Heuristic: hit the base URL and check we didn't land on a login page.
+
+    NetScaler often serves SSO pages inline as HTTP 200 with HTML body
+    (no redirect), so accepting "any <400" would false-positive. We treat
+    responses that either redirect to an SSO URL OR return HTML containing
+    SSO markers as 'not logged in'.
+    """
     with httpx.Client(follow_redirects=False) as client:
         resp = client.get(
             base_url,
@@ -136,10 +136,15 @@ def _netscaler_cookie_is_valid(*, base_url: str, cookie: str) -> bool:
         )
     if resp.status_code in (301, 302, 303, 307, 308):
         location = resp.headers.get("location", "").lower()
-        return not any(
-            marker in location for marker in ("login", "logon", "sso", "saml", "adfs", "oidc")
-        )
-    return resp.status_code < 400
+        return not any(marker in location for marker in _SSO_URL_MARKERS)
+    if resp.status_code >= 400:
+        return False
+    content_type = resp.headers.get("content-type", "").lower()
+    if "text/html" in content_type:
+        body = resp.text[:4096].lower()
+        if any(marker in body for marker in _SSO_URL_MARKERS):
+            return False
+    return True
 
 
 def _confluence_token() -> str:
@@ -244,7 +249,6 @@ def _jira_headers() -> dict:
         "Authorization": f"Bearer {_JIRA_TOKEN}",
         "Accept": "application/json",
     }
-    return {"Cookie": auth_value, "Accept": "application/json"}
 
 
 def _check_confluence(resp: httpx.Response):
@@ -262,9 +266,13 @@ def _check_jira(resp: httpx.Response):
             f"Redirected to {resp.headers.get('location', '?')} — token blocked by NetScaler."
         )
     if resp.status_code != 204 and not resp.content:
+        redacted = {
+            k: ("<redacted>" if k.lower() in {"set-cookie", "cookie", "authorization"} else v)
+            for k, v in resp.headers.items()
+        }
         raise RuntimeError(
             f"Empty response (HTTP {resp.status_code}) — NetScaler may be intercepting. "
-            f"Headers: {dict(resp.headers)}"
+            f"Headers: {redacted}"
         )
     content_type = resp.headers.get("content-type", "")
     if "text/html" in content_type:

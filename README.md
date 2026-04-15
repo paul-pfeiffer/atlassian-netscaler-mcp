@@ -1,105 +1,100 @@
 # atlassian-netscaler-mcp
 
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![FastMCP](https://img.shields.io/badge/built%20with-FastMCP-6f42c1.svg)](https://github.com/jlowin/fastmcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
+An MCP (Model Context Protocol) server for Jira and Confluence Server / Data Center deployments that sit behind Citrix NetScaler SSO.
 
-A unified **Model Context Protocol (MCP)** server for **Jira** and **Confluence** Server / Data Center deployments — including the painful ones sitting behind **Citrix NetScaler / SSO**.
+It captures the NetScaler session cookie via a real browser (Playwright), stores it in the OS keychain (or a 0600 file under `$XDG_CONFIG_HOME/atlassian-mcp/cookies/` when no keychain is available), and attaches it to every Jira / Confluence request. API calls themselves authenticate with a Personal Access Token.
 
-It captures your SSO session cookie via a real browser (Playwright), stores it securely in your OS keychain, and reuses it transparently for all Atlassian API calls. Bring your own corporate Atlassian, get a clean MCP interface for your AI tools.
+## Why
 
----
+Most Atlassian MCP servers assume Atlassian Cloud or a simple API token. Enterprise Server/DC installs typically need more:
 
-## Why?
+- NetScaler / SSO in front of every endpoint
+- Session cookies that expire on their own schedule
+- Per-project custom fields that are required on create but not discoverable from the API
+- Separate Jira and Confluence URLs, one shared gate
 
-Most Atlassian MCP servers assume Atlassian Cloud or a plain API token. Enterprise installs usually aren't that friendly:
-
-- 🔒 SSO / SAML / NetScaler in front of every endpoint
-- 🍪 Short-lived session cookies that expire mid-task
-- 🧩 Customer-specific custom fields that are *required* on creation
-- 🧱 Mixed Jira + Confluence URLs, separate auth flows
-
-This server handles all of that, and exposes one tidy MCP surface to Claude / Cursor / any MCP client.
+This server handles that and exposes a single MCP surface.
 
 ## Features
 
-- ✅ **Unified Jira + Confluence** tools in a single MCP server
-- ✅ **Automatic SSO login** — pops a browser when the cookie is gone, then gets out of your way
-- ✅ **macOS Keychain** session storage (no plaintext cookies on disk)
-- ✅ **Per-customer profiles** for required custom fields, default values, project overrides
-- ✅ **1Password CLI** integration for API tokens (optional)
-- ✅ **SSE / HTTP transport** via [FastMCP](https://github.com/jlowin/fastmcp)
-- ✅ **Tolerant init handshake** for clients that send tool calls before `initialize` completes
+- Unified Jira + Confluence tools in one server
+- Single NetScaler login fronts both APIs — one browser window, one cookie
+- OS keychain when available (macOS Keychain, libsecret, Windows Credential Manager); atomic 0600 file fallback otherwise, with a one-time warning
+- Per-customer profiles for required custom fields and defaults
+- SSE / HTTP transport via [FastMCP](https://github.com/jlowin/fastmcp)
+- Tolerant init handshake for clients that fire tool calls before the MCP `initialize` handshake completes
 
-## Architecture
+## How auth works
 
 ```
-┌──────────────┐    MCP/SSE    ┌──────────────────────┐    HTTPS+cookie    ┌──────────────┐
-│  MCP client  │ ────────────► │   server.py (this)   │ ─────────────────► │  Jira / Conf │
-│ (Claude etc) │ ◄──────────── │  + customer profile  │ ◄───────────────── │   behind SSO │
-└──────────────┘               └──────────┬───────────┘                    └──────────────┘
-                                          │ on 401
+┌──────────────┐    MCP/SSE    ┌──────────────────────┐   HTTPS + cookie + PAT   ┌──────────────┐
+│  MCP client  │ ────────────► │   server.py (this)   │ ───────────────────────► │  Jira / Conf │
+│              │ ◄──────────── │                      │ ◄─────────────────────── │   behind SSO │
+└──────────────┘               └──────────┬───────────┘                          └──────────────┘
+                                          │ on expired cookie
                                           ▼
-                                  ┌───────────────┐    Playwright    ┌──────────────┐
-                                  │   login.py    │ ───────────────► │  SSO browser │
-                                  └───────┬───────┘                  └──────────────┘
+                                  ┌───────────────┐   Playwright   ┌──────────────┐
+                                  │   login.py    │ ─────────────► │  SSO browser │
+                                  └───────┬───────┘                └──────────────┘
                                           │ store cookie
                                           ▼
-                                   macOS Keychain
+                                OS keychain / 0600 file
 ```
 
-## Installation
+The NetScaler cookie alone won't authenticate you to Jira/Confluence — it only gets you past the gate. The PAT you set in `CONFLUENCE_TOKEN` / `JIRA_TOKEN` is what the APIs actually check. Both are required.
 
-Requires Python **3.11+** and [`uv`](https://docs.astral.sh/uv/).
+## Install
+
+Requires Python 3.11+ and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/paul-pfeiffer/atlassian-netscaler-mcp.git
 cd atlassian-netscaler-mcp
 
-# One-time: install Playwright's chromium for the SSO login flow
+# One-time: install the browser used for the SSO login flow
 uv run --with playwright python -m playwright install chromium
 ```
 
-## Configuration
-
-Copy the example envrc and fill in your endpoints:
+## Configure
 
 ```bash
 cp .envrc.example .envrc
-$EDITOR .envrc          # set CONFLUENCE_URL / JIRA_URL
-direnv allow            # if you use direnv
+$EDITOR .envrc     # fill in URLs and tokens
+direnv allow       # if you use direnv
 ```
 
 Required:
 
-| Variable           | Description                                                      |
-| ------------------ | ---------------------------------------------------------------- |
-| `CONFLUENCE_URL`   | Base URL of your Confluence instance                             |
-| `JIRA_URL`         | Base URL of your Jira instance                                   |
-| `CONFLUENCE_TOKEN` | Confluence PAT (or fall back to `ATLASSIAN_TOKEN` for both)      |
-| `JIRA_TOKEN`       | Jira PAT (or fall back to `ATLASSIAN_TOKEN` for both)            |
+| Variable            | Description                                                      |
+| ------------------- | ---------------------------------------------------------------- |
+| `CONFLUENCE_URL`    | Base URL of your Confluence instance                             |
+| `JIRA_URL`          | Base URL of your Jira instance                                   |
+| `CONFLUENCE_TOKEN`  | Confluence PAT                                                   |
+| `JIRA_TOKEN`        | Jira PAT                                                         |
 
-Useful optional:
+`ATLASSIAN_TOKEN` is accepted as a fallback for both `CONFLUENCE_TOKEN` and `JIRA_TOKEN` if you have a single PAT that works for both.
+
+Optional:
 
 | Variable                    | Default | Description                                                    |
 | --------------------------- | ------- | -------------------------------------------------------------- |
 | `MCP_TRANSPORT`             | `sse`   | FastMCP transport (`sse`, `http`, `stdio`)                     |
-| `MCP_PORT`                  | `8000`  | Port for SSE/HTTP transport                                    |
-| `MCP_AUTO_NETSCALER_LOGIN`  | `1`     | Auto-trigger `login.py` when NetScaler cookie missing/expired  |
+| `MCP_HOST`                  | `127.0.0.1` | Bind host                                                  |
+| `MCP_PORT`                  | `8000`  | Bind port                                                      |
+| `MCP_AUTO_NETSCALER_LOGIN`  | `1`     | Trigger `login.py` automatically when the cookie is stale      |
 | `NETSCALER_LOGIN_URL`       | —       | Explicit URL for the login flow (defaults to `JIRA_URL`)       |
-| `NETSCALER_COOKIE`          | —       | Inject a cookie directly instead of reading it from the store  |
+| `NETSCALER_COOKIE`          | —       | Inject a cookie directly, bypassing the store                  |
+| `COOKIE_DOMAIN`             | host    | Suffix-match for cookies captured during login                 |
 | `JIRA_CUSTOMER_PROFILE`     | —       | Profile name under `config/customers/<name>/`                  |
+| `KEYCHAIN_SERVICE`          | `atlassian-mcp` | Keychain service name                                  |
 
-## Usage
-
-### Start the server
+## Run
 
 ```bash
 ./scripts/mcp-start
 ```
 
-The first call against an endpoint without a valid session will pop a Chromium window for SSO; complete the login and the server resumes automatically.
+The first call without a valid cookie opens a Chromium window for SSO; complete the login and the server resumes.
 
 ### Manual login
 
@@ -107,8 +102,7 @@ The first call against an endpoint without a valid session will pop a Chromium w
 uv run login.py
 ```
 
-Only one login is needed — the NetScaler cookie fronts both Jira and Confluence.
-The Jira/Confluence APIs themselves authenticate via Personal Access Token (`CONFLUENCE_TOKEN` / `JIRA_TOKEN`).
+One login covers both Jira and Confluence. The script exits as soon as you've reached the authenticated Atlassian view.
 
 ### Wire into an MCP client
 
@@ -125,7 +119,7 @@ The Jira/Confluence APIs themselves authenticate via Personal Access Token (`CON
 
 ## Customer profiles
 
-Some Jira instances require custom fields on issue creation that aren't discoverable from the API. Drop a profile under `config/customers/<name>/profile.json`:
+Some Jira instances require custom fields on issue creation that aren't discoverable from the API. Drop a profile under `config/customers/<name>/profile.json` — see [`config/customers/example/profile.json`](config/customers/example/profile.json):
 
 ```json
 {
@@ -146,34 +140,26 @@ Some Jira instances require custom fields on issue creation that aren't discover
 }
 ```
 
-Then set `JIRA_CUSTOMER_PROFILE=<name>`. See `config/customers/example/` for a full template.
+Then set `JIRA_CUSTOMER_PROFILE=<name>`.
+
+## Security notes
+
+- The NetScaler cookie is the only secret stored on disk (or in the keychain). PATs come from env vars and are never persisted.
+- File-fallback cookies are written atomically with mode `0600` under `$XDG_CONFIG_HOME/atlassian-mcp/cookies/`. The process logs a warning on first fallback use.
+- Nothing in this repo sends data anywhere other than your configured Jira / Confluence URLs.
 
 ## Roadmap
 
-- [ ] Cross-platform keychain support (Windows Credential Manager, libsecret)
-- [ ] Headless cookie refresh via stored credentials (where SSO allows)
+- [ ] Headless cookie refresh where the SSO flow allows it
 - [ ] Schema-driven profile validation
+- [ ] A minimal test suite
 
 ## Contributing
 
-PRs welcome! Please:
+Issues and PRs welcome. Don't commit `.envrc` or customer profile files — `config/customers/*/` is gitignored except for `example/`.
 
-1. Open an issue first for non-trivial changes
-2. Keep customer-specific config under `config/customers/<name>/` (gitignored except `example/`)
-3. Don't commit `.envrc` or anything containing real URLs / cookies / tokens
+## License
 
-## License & Disclaimer
+[MIT](LICENSE).
 
-[MIT](LICENSE) © Paul Pfeiffer.
-
-**All liability is excluded** to the maximum extent permitted by law. This
-software interacts with corporate auth systems and stores session cookies
-locally — use at your own risk and ensure your use complies with your
-employer's policies and the terms of service of the systems you connect to.
-See [LICENSE](LICENSE) for full disclaimer.
-
-## Acknowledgments
-
-- [FastMCP](https://github.com/jlowin/fastmcp) — the MCP framework doing the heavy lifting
-- [Playwright](https://playwright.dev/) — for the SSO browser dance
-- The [Model Context Protocol](https://modelcontextprotocol.io) spec
+Use at your own risk. This software interacts with corporate auth systems and stores session cookies locally; make sure your use complies with your employer's policies and the terms of service of the systems you connect to.

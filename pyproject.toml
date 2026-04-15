@@ -1,0 +1,25 @@
+[project]
+name = "atlassian-netscaler-mcp"
+version = "0.1.0"
+description = "MCP server for Jira and Confluence Server/DC behind Citrix NetScaler SSO."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Paul Pfeiffer" }]
+
+dependencies = [
+    "fastmcp>=0.2.0",
+    "mcp>=1.0.0",
+    "httpx>=0.27",
+    "keyring>=24.0",
+]
+
+[project.optional-dependencies]
+login = ["playwright>=1.40"]
+
+[project.scripts]
+atlassian-netscaler-mcp = "server:mcp.run"
+
+[project.urls]
+Homepage = "https://github.com/paul-pfeiffer/atlassian-netscaler-mcp"
+Issues = "https://github.com/paul-pfeiffer/atlassian-netscaler-mcp/issues"

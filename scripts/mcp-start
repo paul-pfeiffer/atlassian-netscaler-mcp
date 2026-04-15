@@ -2,4 +2,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-exec uv run --with fastmcp --with keyring --with httpx python server.py
+missing=()
+for var in CONFLUENCE_URL JIRA_URL; do
+  if [ -z "${!var:-}" ]; then missing+=("$var"); fi
+done
+if [ -z "${CONFLUENCE_TOKEN:-}${ATLASSIAN_TOKEN:-}" ]; then missing+=("CONFLUENCE_TOKEN or ATLASSIAN_TOKEN"); fi
+if [ -z "${JIRA_TOKEN:-}${ATLASSIAN_TOKEN:-}" ]; then missing+=("JIRA_TOKEN or ATLASSIAN_TOKEN"); fi
+if [ ${#missing[@]} -ne 0 ]; then
+  echo "mcp-start: missing required env vars: ${missing[*]}" >&2
+  echo "Copy .envrc.example to .envrc, fill it in, then re-run." >&2
+  exit 1
+fi
+
+exec uv run --with fastmcp --with mcp --with keyring --with httpx python server.py
