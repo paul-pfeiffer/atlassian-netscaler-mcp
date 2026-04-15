@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.envrc
+.direnv/
+.DS_Store
+backups/
+.claude/
+config/customers/*/
+!config/customers/example/

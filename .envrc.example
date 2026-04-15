@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# Atlassian endpoints (REQUIRED)
+export CONFLUENCE_URL="${CONFLUENCE_URL:-https://confluence.example.com}"
+export JIRA_URL="${JIRA_URL:-https://jira.example.com}"
+
+# FastMCP transport/server settings
+export MCP_TRANSPORT="${MCP_TRANSPORT:-sse}"
+export MCP_HOST="${MCP_HOST:-127.0.0.1}"
+export MCP_PORT="${MCP_PORT:-8000}"
+
+# Auto-trigger SSO/NetScaler login when session cookie is missing/expired
+export MCP_AUTO_NETSCALER_LOGIN="${MCP_AUTO_NETSCALER_LOGIN:-1}"
+export MCP_AUTO_NETSCALER_TARGETS="${MCP_AUTO_NETSCALER_TARGETS:-jira,confluence}"
+export MCP_AUTO_NETSCALER_MAX_LOGINS="${MCP_AUTO_NETSCALER_MAX_LOGINS:-1}"
+
+# Per-customer profile (config/customers/<name>/profile.json)
+export JIRA_CUSTOMER_PROFILE="${JIRA_CUSTOMER_PROFILE:-example}"
+# export JIRA_CUSTOMER_PROFILE_PATH="${JIRA_CUSTOMER_PROFILE_PATH:-config/customers/example/profile.json}"
+
+# Optional: 1Password CLI integration for API tokens
+# export ATLASSIAN_OP_REF="op://Employee/atlassian api token/password"
+# export CONFLUENCE_OP_REF="${CONFLUENCE_OP_REF:-$ATLASSIAN_OP_REF}"
+# export JIRA_OP_REF="${JIRA_OP_REF:-$ATLASSIAN_OP_REF}"
+# if command -v op >/dev/null 2>&1; then
+#   export CONFLUENCE_TOKEN="${CONFLUENCE_TOKEN:-$(op read "$CONFLUENCE_OP_REF" 2>/dev/null || true)}"
+#   export JIRA_TOKEN="${JIRA_TOKEN:-$(op read "$JIRA_OP_REF" 2>/dev/null || true)}"
+# fi
+
+# Add local scripts to PATH
+export PATH="$PWD/scripts:$PATH"
