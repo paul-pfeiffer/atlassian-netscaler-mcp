@@ -1,6 +1,9 @@
 # atlassian-netscaler-mcp
 
 [![tests](https://github.com/paul-pfeiffer/atlassian-netscaler-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/paul-pfeiffer/atlassian-netscaler-mcp/actions/workflows/tests.yml)
+[![python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-compatible-6f42c1)](https://modelcontextprotocol.io)
 
 An MCP (Model Context Protocol) server for Jira and Confluence Server / Data Center deployments that sit behind Citrix NetScaler SSO.
 
