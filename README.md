@@ -144,6 +144,8 @@ Some Jira instances require custom fields on issue creation that aren't discover
 
 Then set `JIRA_CUSTOMER_PROFILE=<name>`.
 
+Profiles are validated against [`config/profile.schema.json`](config/profile.schema.json) at load time — a typo like `default_fiedls` fails loudly with a clear error instead of being silently ignored. Editors that honor the `$schema` field (VS Code, JetBrains) will autocomplete and live-validate while you edit.
+
 ## Security notes
 
 - The NetScaler cookie is the only secret stored on disk (or in the keychain). PATs come from env vars and are never persisted.
@@ -152,7 +154,8 @@ Then set `JIRA_CUSTOMER_PROFILE=<name>`.
 
 ## Roadmap
 
-- [ ] Schema-driven profile validation
+- [ ] A `profile doctor` CLI that previews which fields a given profile would inject for a project/issue-type
+- [ ] Hot-reload profiles on file change
 
 ## Contributing
 

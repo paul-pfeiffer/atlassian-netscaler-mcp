@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/paul-pfeiffer/atlassian-netscaler-mcp/blob/main/config/profile.schema.json",
+  "title": "Atlassian MCP customer profile",
+  "description": "Per-customer configuration for required/default Jira fields not discoverable from the API.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "jira": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project_overrides": {
+          "type": "object",
+          "description": "Keyed by Jira project key (e.g. 'MYPROJ'). Lookups are case-insensitive.",
+          "additionalProperties": { "$ref": "#/$defs/projectOverride" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "projectOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issue_type_overrides": {
+          "type": "object",
+          "description": "Keyed by issue type name (e.g. 'Story'). Lookups are case-insensitive.",
+          "additionalProperties": { "$ref": "#/$defs/issueTypeOverride" }
+        }
+      }
+    },
+    "issueTypeOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required_fields": {
+          "type": "array",
+          "description": "Field IDs (e.g. 'customfield_12345') that must be present on create.",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "default_fields": {
+          "type": "object",
+          "description": "Field ID → default value. Value shape follows the Jira REST API for that field.",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

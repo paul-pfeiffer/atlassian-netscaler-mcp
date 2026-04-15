@@ -1,18 +1,13 @@
 {
+  "$schema": "../../profile.schema.json",
   "jira": {
     "project_overrides": {
       "EXAMPLE": {
         "issue_type_overrides": {
           "Story": {
-            "required_fields": [
-              "customfield_12345"
-            ],
+            "required_fields": ["customfield_12345"],
             "default_fields": {
-              "customfield_12345": [
-                {
-                  "key": "EXAMPLE-1"
-                }
-              ]
+              "customfield_12345": [{ "key": "EXAMPLE-1" }]
             }
           }
         }

@@ -48,6 +48,9 @@ AUTO_INITIALIZE_ON_EARLY_REQUEST = os.environ.get(
 JIRA_CUSTOMER_PROFILE = os.environ.get("JIRA_CUSTOMER_PROFILE", "").strip().lower()
 JIRA_CUSTOMER_PROFILE_PATH = os.environ.get("JIRA_CUSTOMER_PROFILE_PATH", "").strip()
 CUSTOMER_CONFIG_DIR = os.path.join(os.path.dirname(__file__), "config", "customers")
+CUSTOMER_PROFILE_SCHEMA = os.path.join(
+    os.path.dirname(__file__), "config", "profile.schema.json"
+)
 _CUSTOMER_PROFILE_LOCK = threading.Lock()
 _CUSTOMER_PROFILE: dict | None = None
 
@@ -369,8 +372,33 @@ def _customer_profile_data() -> dict:
             loaded = json.load(handle)
         if not isinstance(loaded, dict):
             raise RuntimeError(f"Customer profile must be a JSON object: {profile_file}")
+        _validate_customer_profile(loaded, profile_file)
         _CUSTOMER_PROFILE = loaded
         return _CUSTOMER_PROFILE
+
+
+def _validate_customer_profile(profile: dict, source: str) -> None:
+    """Validate a profile against config/profile.schema.json.
+
+    If the `jsonschema` package isn't installed, skip silently — the
+    server still works, callers just lose the up-front error. The
+    schema file is optional at runtime; if it's missing, skip.
+    """
+    if not os.path.exists(CUSTOMER_PROFILE_SCHEMA):
+        return
+    try:
+        import jsonschema
+    except ImportError:
+        return
+    with open(CUSTOMER_PROFILE_SCHEMA, "r", encoding="utf-8") as handle:
+        schema = json.load(handle)
+    try:
+        jsonschema.validate(profile, schema)
+    except jsonschema.ValidationError as exc:
+        path = "/".join(str(p) for p in exc.absolute_path) or "<root>"
+        raise RuntimeError(
+            f"Customer profile {source} failed validation at '{path}': {exc.message}"
+        ) from exc
 
 
 def _customer_issue_overrides(project_key: str, issue_type_name: str) -> dict:

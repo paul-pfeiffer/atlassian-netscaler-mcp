@@ -14,4 +14,4 @@ if [ ${#missing[@]} -ne 0 ]; then
   exit 1
 fi
 
-exec uv run --with fastmcp --with mcp --with keyring --with httpx python server.py
+exec uv run --with fastmcp --with mcp --with keyring --with httpx --with jsonschema python server.py

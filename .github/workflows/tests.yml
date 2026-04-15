@@ -19,4 +19,4 @@ jobs:
       - name: Set up Python
         run: uv python install "$PY"
       - name: Run tests
-        run: uv run --python "$PY" --with pytest --with httpx --with keyring --with fastmcp --with mcp pytest
+        run: uv run --python "$PY" --with pytest --with httpx --with keyring --with fastmcp --with mcp --with jsonschema pytest
