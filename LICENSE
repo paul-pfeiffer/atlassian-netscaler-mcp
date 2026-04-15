@@ -1,0 +1,41 @@
+MIT License
+
+Copyright (c) 2026 Paul Pfeiffer
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+---
+
+DISCLAIMER OF LIABILITY
+
+To the maximum extent permitted by applicable law, the authors and
+contributors of this Software disclaim ALL liability of any kind arising
+from the use, misuse, or inability to use this Software, including but not
+limited to: direct, indirect, incidental, special, exemplary, consequential,
+or punitive damages; loss of data, profits, revenue, or business;
+unauthorized access to systems; security breaches; account lockouts; service
+disruptions; violations of third-party terms of service (including but not
+limited to those of Atlassian, Citrix, or any identity provider); or any
+other harm whatsoever.
+
+This Software interacts with third-party systems (Jira, Confluence,
+NetScaler, SSO providers) and stores authentication material on the user's
+machine. Users are solely responsible for ensuring their use complies with
+all applicable laws, employer policies, and the terms of service of the
+systems they connect to. Use at your own risk.

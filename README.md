@@ -54,7 +54,7 @@ This server handles all of that, and exposes one tidy MCP surface to Claude / Cu
 Requires Python **3.11+** and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
-git clone https://github.com/<your-user>/atlassian-netscaler-mcp.git
+git clone https://github.com/paul-pfeiffer/atlassian-netscaler-mcp.git
 cd atlassian-netscaler-mcp
 
 # One-time: install Playwright's chromium for the SSO login flow
@@ -158,9 +158,15 @@ PRs welcome! Please:
 2. Keep customer-specific config under `config/customers/<name>/` (gitignored except `example/`)
 3. Don't commit `.envrc` or anything containing real URLs / cookies / tokens
 
-## License
+## License & Disclaimer
 
-[MIT](LICENSE) © Contributors
+[MIT](LICENSE) © Paul Pfeiffer.
+
+**All liability is excluded** to the maximum extent permitted by law. This
+software interacts with corporate auth systems and stores session cookies
+locally — use at your own risk and ensure your use complies with your
+employer's policies and the terms of service of the systems you connect to.
+See [LICENSE](LICENSE) for full disclaimer.
 
 ## Acknowledgments
 

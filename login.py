@@ -5,7 +5,9 @@
 # ///
 """
 Opens a browser, waits for you to log in via SSO,
-then stores the session cookie securely in macOS Keychain.
+then stores the session cookie securely in OS keychain
+(macOS Keychain / libsecret / Windows Credential Manager) with a
+file-backed fallback under $XDG_CONFIG_HOME/atlassian-mcp/cookies/.
 
 First-time setup:
   uv run --with playwright python -m playwright install chromium
@@ -24,13 +26,16 @@ Configuration (env vars):
 
 import argparse
 import os
+import sys
 import time
 from urllib.parse import urlparse
 
-import keyring
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from playwright.sync_api import sync_playwright, Page
 
-KEYCHAIN_SERVICE = os.environ.get("KEYCHAIN_SERVICE", "atlassian-mcp")
+from cookie_store import set_cookie
+
 LEGACY_KEYCHAIN_ACCOUNT = "session-cookie"
 SSO_INDICATORS = ["login", "sso", "auth", "saml", "adfs", "idp", "oidc"]
 
@@ -53,9 +58,9 @@ def default_cookie_domain(base_url: str) -> str:
 
 
 def store_cookie(cookie: str, account: str) -> str:
-    keyring.set_password(KEYCHAIN_SERVICE, account, cookie)
-    keyring.set_password(KEYCHAIN_SERVICE, LEGACY_KEYCHAIN_ACCOUNT, cookie)
-    return "Keychain"
+    where = set_cookie(account, cookie)
+    set_cookie(LEGACY_KEYCHAIN_ACCOUNT, cookie)
+    return where
 
 
 def is_logged_in(page: Page, base_url: str) -> bool:
@@ -118,7 +123,7 @@ def main():
 
     print(f"Logged in — captured {n} cookies")
     backend = store_cookie(cookie, keychain_account)
-    print(f"Cookie stored in {backend} ({keychain_account}) — session is ready.")
+    print(f"Cookie stored in {backend} as '{keychain_account}' — session is ready.")
 
 
 if __name__ == "__main__":

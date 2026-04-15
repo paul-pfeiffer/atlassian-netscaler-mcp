@@ -6,16 +6,16 @@ import shutil
 import subprocess
 import threading
 import json
-import keyring
 import httpx
 from fastmcp import FastMCP
+
+from cookie_store import get_cookie
 from mcp import types as mcp_types
 from mcp.server import session as mcp_session
 
 CONFLUENCE_URL = os.environ.get("CONFLUENCE_URL", "").rstrip("/")
 JIRA_URL = os.environ.get("JIRA_URL", "").rstrip("/")
 
-KEYCHAIN_SERVICE = "confluence-mcp"
 CONFLUENCE_KEYCHAIN_ACCOUNTS = [
     "confluence-session-cookie",
     "session-cookie",
@@ -131,7 +131,7 @@ _patch_server_session_init_tolerance()
 
 def _keychain_cookie(accounts: list[str]) -> str:
     for account in accounts:
-        value = keyring.get_password(KEYCHAIN_SERVICE, account)
+        value = get_cookie(account)
         if value:
             return value
     return ""
