@@ -1,5 +1,7 @@
 # atlassian-netscaler-mcp
 
+[![tests](https://github.com/paul-pfeiffer/atlassian-netscaler-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/paul-pfeiffer/atlassian-netscaler-mcp/actions/workflows/tests.yml)
+
 An MCP (Model Context Protocol) server for Jira and Confluence Server / Data Center deployments that sit behind Citrix NetScaler SSO.
 
 It captures the NetScaler session cookie via a real browser (Playwright), stores it in the OS keychain (or a 0600 file under `$XDG_CONFIG_HOME/atlassian-mcp/cookies/` when no keychain is available), and attaches it to every Jira / Confluence request. API calls themselves authenticate with a Personal Access Token.

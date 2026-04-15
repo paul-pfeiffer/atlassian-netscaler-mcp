@@ -16,6 +16,11 @@ dependencies = [
 
 [project.optional-dependencies]
 login = ["playwright>=1.40"]
+dev = ["pytest>=8.0", "pytest-cov>=4.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
 
 [project.scripts]
 atlassian-netscaler-mcp = "server:mcp.run"
